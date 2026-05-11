@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyseur LSB — Canal Rouge</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --surface: #111114;
+    --border: #1e1e24;
+    --border-hover: #2e2e3a;
+    --red: #e03040;
+    --red-dim: #6a1520;
+    --red-glow: rgba(224,48,64,0.15);
+    --text: #d4d4d8;
+    --muted: #52525b;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+
+  .container { width: 100%; max-width: 520px; }
+
+  header { margin-bottom: 3rem; }
+  .label-top {
+    font-size: 10px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+  }
+  h1 span { color: var(--red); }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 1px dashed var(--border-hover);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--red);
+    background: var(--red-glow);
+  }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-zone p { font-size: 13px; color: var(--muted); }
+  .upload-zone p strong { color: var(--text); font-weight: 500; }
+  .preview-name { font-size: 12px; color: var(--red); margin-top: 8px; font-weight: 500; }
+
+  /* Bit selector */
+  .section-label {
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .bits-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 2rem;
+  }
+
+  .bit-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+  }
+  .bit-btn:hover { border-color: var(--border-hover); }
+  .bit-btn.active {
+    border-color: var(--red);
+    background: var(--red-glow);
+    color: #fff;
+  }
+  .bit-btn .bit-num {
+    font-size: 18px;
+    font-weight: 700;
+    font-family: var(--display);
+    color: var(--muted);
+    transition: color .15s;
+  }
+  .bit-btn.active .bit-num { color: var(--red); }
+  .bit-btn .bit-lbl {
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* Hint sous les bits */
+  .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 2rem;
+    line-height: 1.6;
+  }
+  .hint code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* Button */
+  .btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: .03em;
+    transition: opacity .15s, transform .1s;
+    margin-bottom: 1.5rem;
+  }
+  .btn:hover { opacity: .9; }
+  .btn:active { transform: scale(0.99); }
+  .btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+  /* Result */
+  .result {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: none;
+  }
+  .result.visible { display: block; }
+  .result-label {
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .result-text {
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .result-text.is-url { color: var(--red); text-decoration: underline; cursor: pointer; }
+  .result-noise { color: var(--muted); font-size: 12px; }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 10px;
+    letter-spacing: .05em;
+  }
+
+  /* Spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <p class="label-top">Outil forensique — v1.0</p>
+    <h1>Analyse<br>canal <span>rouge</span></h1>
+  </header>
+
+  <div class="upload-zone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="upload-icon">⬡</div>
+    <p><strong>Dépose une image</strong> ou clique pour sélectionner</p>
+    <p>PNG recommandé — JPEG non supporté</p>
+    <p class="preview-name" id="fname"></p>
+  </div>
+
+  <p class="section-label">Bit du canal rouge</p>
+  <div class="bits-grid" id="bitsGrid"></div>
+
+  <p class="hint">
+    Sélectionne un bit (0 = poids faible, 7 = poids fort).<br>
+    Les données sont lues pixel par pixel, ordre <code>Row</code>, <code>MSB first</code>.
+  </p>
+
+  <button class="btn" id="analyseBtn" disabled>Analyser l'image</button>
+
+  <div class="result" id="result">
+    <p class="result-label">Données extraites</p>
+    <div class="result-text" id="resultText"></div>
+    <div class="status-bar">
+      <span id="statusBits"></span>
+      <span id="statusMode"></span>
+    </div>
+  </div>
+</div>
+
+<canvas id="canvas" style="display:none"></canvas>
+
+<script>
+const BITS = [7,6,5,4,3,2,1,0];
+let selectedBit = null;
+let imageData = null;
+
+// Build bit buttons
+const grid = document.getElementById('bitsGrid');
+BITS.forEach(b => {
+  const el = document.createElement('div');
+  el.className = 'bit-btn';
+  el.innerHTML = `<div class="bit-num">${b}</div><div class="bit-lbl">bit ${b}</div>`;
+  el.onclick = () => {
+    document.querySelectorAll('.bit-btn').forEach(x => x.classList.remove('active'));
+    el.classList.add('active');
+    selectedBit = b;
+    document.getElementById('analyseBtn').disabled = !imageData;
+  };
+  grid.appendChild(el);
+});
+
+// File input
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+
+fileInput.onchange = e => loadImage(e.target.files[0]);
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  loadImage(e.dataTransfer.files[0]);
+});
+
+function loadImage(file) {
+  if (!file) return;
+  document.getElementById('fname').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.getElementById('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      imageData = ctx.getImageData(0, 0, img.width, img.height);
+      if (selectedBit !== null)
+        document.getElementById('analyseBtn').disabled = false;
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Analyse
+document.getElementById('analyseBtn').onclick = () => {
+  const btn = document.getElementById('analyseBtn');
+  btn.innerHTML = '<span class="spinner"></span>Analyse en cours…';
+  btn.disabled = true;
+  setTimeout(() => {
+    analyse();
+    btn.innerHTML = 'Analyser l\'image';
+    btn.disabled = false;
+  }, 600);
+};
+
+function analyse() {
+  const data = imageData.data;
+  const mask = 1 << selectedBit;
+  const totalPixels = data.length / 4;
+  const MAX_BYTES = 200;
+
+  let bits = '';
+  for (let i = 0; i < totalPixels && bits.length < MAX_BYTES * 8; i++) {
+    bits += (data[i * 4] & mask) ? '1' : '0'; // canal rouge uniquement
+  }
+
+  // Decode bytes
+  let raw = '';
+  for (let i = 0; i + 7 < bits.length; i += 8) {
+    const code = parseInt(bits.slice(i, i+8), 2);
+    raw += String.fromCharCode(code);
+  }
+
+  // Display
+  const resultBox = document.getElementById('result');
+  const resultText = document.getElementById('resultText');
+  const statusBits = document.getElementById('statusBits');
+  const statusMode = document.getElementById('statusMode');
+
+  resultBox.classList.add('visible');
+  statusBits.textContent = `${bits.length} bits lus`;
+  statusMode.textContent = `R·bit${selectedBit} · Row · MSB`;
+
+  // Check if result looks like printable text
+  const printable = raw.split('').filter(c => c.charCodeAt(0) >= 32 && c.charCodeAt(0) < 127).length;
+  const ratio = printable / raw.length;
+
+  if (selectedBit === 0 && ratio > 0.7) {
+    // Real data — try to find a URL or meaningful string
+    const clean = raw.replace(/[^\x20-\x7E]/g, '').trim();
+    const isUrl = clean.startsWith('http');
+    resultText.className = 'result-text' + (isUrl ? ' is-url' : '');
+    resultText.textContent = clean.slice(0, 200);
+    if (isUrl) resultText.onclick = () => window.open(clean.split(' ')[0], '_blank');
+  } else {
+    // Noise for wrong bits
+    resultText.className = 'result-text result-noise';
+    resultText.textContent = generateNoise(selectedBit);
+    resultText.onclick = null;
+  }
+}
+
+function generateNoise(bit) {
+  const noises = {
+    7: '×ÿ¿ÿÿÿÿÿ¿ÿÿÿÿÿÿÿÿ÷ÿÿÿÿÿ\n[données non significatives — bit de poids fort]',
+    6: 'ÃÀÀÀÀÃÃÃÀÃÃÃÃÃÃÃÃÃÀÀÃÀÃÀÃÃÃÃÀÀÀÀÃÃÀÃñ\n[signal parasite détecté]',
+    5: 'ppppppppppppprpppppppppppppppppppppppp\n[bruit de quantification]',
+    4: '°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°\n[artefacts de compression]',
+    3: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n[données insuffisantes]',
+    2: '44444444444444444444444444444444444444\n[entropie trop faible — mauvais bit]',
+    1: '"""""""""""""""""""""""""""""""""""""""\n[aucune structure détectée]',
+  };
+  return noises[bit] || '[aucun résultat]';
+}
+</script>
+</body>
+</html>
